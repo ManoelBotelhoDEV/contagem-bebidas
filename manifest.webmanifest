@@ -1,0 +1,15 @@
+{
+  "name": "Contagem de Bebidas",
+  "short_name": "Contagem",
+  "description": "Registro diário da contagem de estoque de bebidas",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f3ef",
+  "theme_color": "#b3261e",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

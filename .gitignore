@@ -1,0 +1,7 @@
+# Local Netlify folder
+.netlify
+
+# Segredos e dependências (nunca enviar ao GitHub)
+.env
+.env.*
+node_modules

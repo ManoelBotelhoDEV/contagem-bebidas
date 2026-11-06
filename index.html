@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#b3261e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Contagem de Bebidas</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- TELA 1: ENTRAR -->
+  <main id="tela-login" class="tela ativa">
+    <div class="cartao login">
+      <img src="img/icon.svg" alt="" class="logo" width="72" height="72">
+      <h1>Contagem de Bebidas</h1>
+      <p class="sub">Informe seu nome para iniciar a contagem.</p>
+
+      <label for="nome">Seu nome</label>
+      <input id="nome" type="text" autocomplete="name" placeholder="Ex.: João Silva" maxlength="60">
+
+      <label for="periodo">Momento da contagem</label>
+      <select id="periodo">
+        <option value="Almoço - Abertura">Almoço - Abertura</option>
+        <option value="Almoço - Fechamento">Almoço - Fechamento</option>
+        <option value="Jantar - Abertura">Jantar - Abertura</option>
+        <option value="Jantar - Fechamento">Jantar - Fechamento</option>
+      </select>
+
+      <p id="erro-login" class="erro" role="alert" hidden></p>
+      <button id="btn-entrar" class="btn primario grande" type="button">Entrar</button>
+    </div>
+  </main>
+
+  <!-- TELA 2: CONTAGEM -->
+  <main id="tela-contagem" class="tela">
+    <header class="topo">
+      <div>
+        <strong id="topo-nome"></strong>
+        <span id="topo-periodo" class="pequeno"></span>
+      </div>
+      <button id="btn-sair" class="link" type="button">Sair</button>
+    </header>
+
+    <div class="progresso" aria-live="polite">
+      <div class="barra"><div id="barra-prog"></div></div>
+      <span id="txt-prog">0 de 9 confirmados</span>
+    </div>
+
+    <ul id="lista" class="lista"></ul>
+
+    <div class="rodape-acao">
+      <p id="erro-envio" class="erro" role="alert" hidden></p>
+      <button id="btn-gerar" class="btn primario grande" type="button" disabled>Gerar relatório</button>
+    </div>
+  </main>
+
+  <!-- TELA 3: COMPROVANTE -->
+  <main id="tela-final" class="tela">
+    <div class="cartao">
+      <div id="final-icone" class="final-icone">✓</div>
+      <h1 id="final-titulo">Relatório enviado!</h1>
+      <p id="final-msg" class="sub"></p>
+      <p id="final-aviso" class="aviso" role="alert" hidden></p>
+
+      <div class="comprovante" id="comprovante"></div>
+
+      <button id="btn-nova" class="btn secundario grande" type="button">Nova contagem</button>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+[
+  {
+    "id": "fanta-uva",
+    "nome": "Fanta uva",
+    "img": "img/fanta-uva.svg"
+  },
+  {
+    "id": "schweppes",
+    "nome": "Schweppes",
+    "img": "img/schweppes.svg"
+  },
+  {
+    "id": "sprite-zero-acucar",
+    "nome": "Sprite zero açúcar",
+    "img": "img/sprite-zero-acucar.svg"
+  },
+  {
+    "id": "sprite",
+    "nome": "Sprite",
+    "img": "img/sprite.svg"
+  },
+  {
+    "id": "schweppes-tonica",
+    "nome": "Schweppes tônica",
+    "img": "img/schweppes-tonica.svg"
+  },
+  {
+    "id": "fanta-laranja",
+    "nome": "Fanta laranja",
+    "img": "img/fanta-laranja.svg"
+  },
+  {
+    "id": "schweppes-tonica-zero",
+    "nome": "Schweppes tônica zero açúcar",
+    "img": "img/schweppes-tonica-zero.svg"
+  },
+  {
+    "id": "dell-valle-uva",
+    "nome": "Dell Valle uva",
+    "img": "img/dell-valle-uva.svg"
+  },
+  {
+    "id": "dell-valle-pessego",
+    "nome": "Dell Valle pêssego",
+    "img": "img/dell-valle-pessego.svg"
+  },
+  {
+    "id": "fanta-guarana-zero",
+    "nome": "Fanta guaraná sem açúcar",
+    "img": "img/fanta-guarana-zero.svg"
+  },
+  {
+    "id": "fanta-guarana",
+    "nome": "Fanta guaraná",
+    "img": "img/fanta-guarana.svg"
+  },
+  {
+    "id": "monster",
+    "nome": "Monster",
+    "img": "img/monster.svg"
+  },
+  {
+    "id": "monster-zero",
+    "nome": "Monster zero açúcar",
+    "img": "img/monster-zero.svg"
+  },
+  {
+    "id": "red-bull",
+    "nome": "Red Bull",
+    "img": "img/red-bull.svg"
+  },
+  {
+    "id": "agua-sem-gas",
+    "nome": "Água sem gás",
+    "img": "img/agua-sem-gas.svg"
+  },
+  {
+    "id": "agua-com-gas",
+    "nome": "Água com gás",
+    "img": "img/agua-com-gas.svg"
+  },
+  {
+    "id": "sprite-lemon",
+    "nome": "Sprite lemon",
+    "img": "img/sprite-lemon.svg"
+  },
+  {
+    "id": "coca-cola-zero",
+    "nome": "Coca-Cola zero açúcar",
+    "img": "img/coca-cola-zero.svg"
+  },
+  {
+    "id": "coca-cola",
+    "nome": "Coca-Cola",
+    "img": "img/coca-cola.svg"
+  },
+  {
+    "id": "coca-cola-sem-cafeina",
+    "nome": "Coca-Cola sem cafeína",
+    "img": "img/coca-cola-sem-cafeina.svg"
+  },
+  {
+    "id": "eisenbahn-pale-ale",
+    "nome": "Eisenbahn Pale Ale",
+    "img": "img/eisenbahn-pale-ale.svg"
+  },
+  {
+    "id": "eisenbahn-ipa",
+    "nome": "Eisenbahn IPA",
+    "img": "img/eisenbahn-ipa.svg"
+  },
+  {
+    "id": "eisenbahn-pilsen",
+    "nome": "Eisenbahn Pilsen",
+    "img": "img/eisenbahn-pilsen.svg"
+  },
+  {
+    "id": "heineken-zero",
+    "nome": "Heineken Zero",
+    "img": "img/heineken-zero.svg"
+  },
+  {
+    "id": "heineken-puro-malte",
+    "nome": "Heineken Puro Malte",
+    "img": "img/heineken-puro-malte.svg"
+  },
+  {
+    "id": "amstel-lager",
+    "nome": "Amstel Lager",
+    "img": "img/amstel-lager.svg"
+  },
+  {
+    "id": "amstel-ultra",
+    "nome": "Amstel Ultra",
+    "img": "img/amstel-ultra.svg"
+  },
+  {
+    "id": "sol",
+    "nome": "Sol",
+    "img": "img/sol.svg"
+  },
+  {
+    "id": "heineken-ultra",
+    "nome": "Heineken Ultra",
+    "img": "img/heineken-ultra.svg"
+  },
+  {
+    "id": "ice",
+    "nome": "Ice",
+    "img": "img/ice.svg"
+  }
+]
