@@ -47,12 +47,17 @@
       <button id="btn-sair" class="link" type="button">Sair</button>
     </header>
 
-    <div class="progresso" aria-live="polite">
+    <nav id="abas" class="abas" aria-label="Geladeiras"></nav>
+    <p id="aviso-etapa" class="aviso" role="status" hidden></p>
+
+    <div id="bloco-prog" class="progresso" aria-live="polite">
       <div class="barra"><div id="barra-prog"></div></div>
-      <span id="txt-prog">0 de 9 confirmados</span>
+      <span id="txt-prog"></span>
     </div>
 
-    <ul id="lista" class="lista"></ul>
+    <div id="listas"></div>
+
+    <section id="painel-total" class="painel-total" hidden></section>
 
     <div class="rodape-acao">
       <p id="erro-envio" class="erro" role="alert" hidden></p>

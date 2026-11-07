@@ -13,6 +13,9 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* O atributo hidden deve sempre vencer qualquer display definido nas classes */
+[hidden] { display: none !important; }
+
 html, body { margin: 0; padding: 0; }
 
 body {
@@ -98,10 +101,40 @@ input:focus, select:focus { outline: none; border-color: var(--vermelho); }
   transition: opacity .2s, border-color .2s, background .2s;
 }
 .item img { width: 64px; height: 64px; object-fit: contain; }
-.item .nome { font-weight: 700; line-height: 1.2; }
+.item .nome { font-weight: 700; line-height: 1.2; min-width: 0; overflow-wrap: anywhere; }
 .item .acao { display: flex; align-items: center; gap: 8px; }
 .item input[type=number] { width: 84px; text-align: center; font-size: 1.2rem; font-weight: 700; padding: 10px 6px; }
 .item small { display: block; color: var(--suave); font-weight: 400; font-size: .75rem; margin-top: 2px; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Abas das geladeiras */
+.abas {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; gap: 6px; padding: 6px 0 8px; background: var(--fundo);
+}
+.aba {
+  flex: 1; min-width: 0; font: inherit; text-align: center; line-height: 1.15; cursor: pointer;
+  background: #fff; color: var(--texto); border: 2px solid var(--borda); border-radius: 12px; padding: 7px 2px;
+}
+.aba b { display: block; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aba small { display: block; font-size: .72rem; font-weight: 600; color: var(--suave); white-space: nowrap; }
+.aba.concluida:not(.ativa) { border-color: var(--verde); background: var(--verde-claro); }
+.aba.ativa { border-color: var(--vermelho); background: var(--vermelho); color: #fff; }
+.aba.ativa small { color: #fff; opacity: .9; }
+.aba:disabled { opacity: .45; cursor: not-allowed; }
+
+#aviso-etapa { margin: 0 0 12px; }
+
+/* Aba "Total" */
+.painel-total { background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 8px; }
+.tabela-total { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .85rem; }
+.tabela-total th, .tabela-total td { padding: 7px 4px; border-bottom: 1px solid var(--borda); text-align: right; }
+.tabela-total th:first-child, .tabela-total td:first-child { text-align: left; width: 38%; overflow-wrap: anywhere; }
+.tabela-total .t, .tabela-total th:last-child { font-weight: 800; }
+.tabela-total tfoot td { font-weight: 800; background: var(--fundo); border-bottom: 0; }
+.painel-total .dica { margin: 10px 4px 2px; color: var(--suave); font-size: .8rem; }
 
 .btn-check {
   width: 48px; height: 48px; border-radius: 50%;
@@ -137,15 +170,15 @@ input:focus, select:focus { outline: none; border-color: var(--vermelho); }
 }
 .comprovante .linha { display: flex; justify-content: space-between; padding: 4px 0; }
 .comprovante .linha.item-linha { border-top: 1px solid var(--borda); }
+.comprovante .linha small { display: block; color: var(--suave); font-size: .75rem; font-weight: 400; margin-top: 1px; }
+.comprovante .linha > span { min-width: 0; }
+.comprovante .total-geral { font-size: 1.05rem; }
 .comprovante h2 { font-size: 1rem; margin: 10px 0 4px; }
 
 .aviso {
   background: #fff4e5; border: 1px solid #f0b95b; color: #7a4a00;
   border-radius: 10px; padding: 10px 12px; text-align: left; font-weight: 600; margin: 0 0 12px;
 }
-
-/* Itens sempre podem encolher dentro do cartão (evita estourar a largura da tela) */
-.item .nome { min-width: 0; overflow-wrap: anywhere; }
 
 /* Celulares estreitos (até 380 px): layout mais compacto, alvos de toque continuam >= 42 px */
 @media (max-width: 380px) {
@@ -158,4 +191,6 @@ input:focus, select:focus { outline: none; border-color: var(--vermelho); }
   .item input[type=number] { width: 68px; font-size: 1.1rem; padding: 9px 4px; }
   .btn-check { width: 44px; height: 44px; }
   .cartao { padding: 20px 14px; }
+  .aba b { font-size: .78rem; }
+  .tabela-total { font-size: .8rem; }
 }

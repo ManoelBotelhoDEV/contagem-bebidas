@@ -10,6 +10,7 @@
 //   EMAIL_REMETENTE  ex.: "Contagem <contagem@seudominio.com.br>" (opcional)
 
 const ITENS = require('../../itens.json'); // mesma lista usada pelo celular
+const { geladeiras: GELADEIRAS } = require('../../config.json'); // nomes das geladeiras
 
 const PERIODOS = [
   'Almoço - Abertura',
@@ -62,11 +63,16 @@ function validar(corpo) {
   const itens = [];
   for (const ref of ITENS) {
     const recebido = porId.get(ref.id);
-    const qtd = recebido ? recebido.qtd : undefined;
-    if (!Number.isInteger(qtd) || qtd < 0 || qtd > 9999) {
+    if (!recebido) return { erro: `Item ausente: ${ref.nome}.` };
+    if (!Array.isArray(recebido.geladeiras)) {
+      return { erro: 'Versão antiga do app. Feche e abra o app novamente e refaça a contagem.' };
+    }
+    const g = recebido.geladeiras;
+    if (g.length !== GELADEIRAS.length || !g.every((n) => Number.isInteger(n) && n >= 0 && n <= 9999)) {
       return { erro: `Quantidade inválida para ${ref.nome}.` };
     }
-    itens.push({ id: ref.id, nome: ref.nome, qtd });
+    // o total é sempre calculado aqui, nunca confiado ao celular
+    itens.push({ id: ref.id, nome: ref.nome, geladeiras: g, qtd: g.reduce((a, b) => a + b, 0) });
   }
   return { nome, periodo: corpo.periodo, turno, momento, itens };
 }
@@ -77,6 +83,7 @@ const sinal = (n) => (n > 0 ? `+${n}` : String(n));
 // ---------- E-mail 1: comprovante da contagem (abertura ou fechamento) ----------
 function montarEmailContagem({ nome, periodo, itens }, { data, hora }) {
   const total = soma(itens);
+  const totaisGel = GELADEIRAS.map((_, j) => itens.reduce((s, x) => s + x.geladeiras[j], 0));
 
   const texto = [
     'CONTAGEM DE BEBIDAS',
@@ -86,18 +93,22 @@ function montarEmailContagem({ nome, periodo, itens }, { data, hora }) {
     `Data: ${data}`,
     `Hora: ${hora}`,
     '',
-    ...itens.map((x) => `${x.nome}: ${x.qtd}`),
+    ...itens.map((x) =>
+      `${x.nome}: ${GELADEIRAS.map((g, j) => `${g}: ${x.geladeiras[j]}`).join(' | ')} | Total: ${x.qtd}`),
     '',
-    `Total de unidades: ${total}`
+    `TOTAIS: ${GELADEIRAS.map((g, j) => `${g}: ${totaisGel[j]}`).join(' | ')} | Total geral: ${total}`
   ].join('\n');
 
+  const td = 'padding:7px 8px;border-bottom:1px solid #eee;text-align:right;';
+  const th = 'padding:8px;text-align:right;font-size:12px;';
   const linhas = itens.map((x) =>
-    `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee">${esc(x.nome)}</td>` +
-    `<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right"><strong>${x.qtd}</strong></td></tr>`
+    `<tr><td style="padding:7px 8px;border-bottom:1px solid #eee">${esc(x.nome)}</td>` +
+    x.geladeiras.map((n) => `<td style="${td}">${n}</td>`).join('') +
+    `<td style="${td}font-weight:bold">${x.qtd}</td></tr>`
   ).join('');
 
   const html =
-    `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#222">` +
+    `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#222">` +
     `<h2 style="color:#b3261e;margin-bottom:4px">Contagem de bebidas</h2>` +
     `<p style="margin:0 0 12px;color:#666">Comprovante de registro</p>` +
     `<table style="width:100%;border-collapse:collapse;margin-bottom:16px">` +
@@ -107,9 +118,13 @@ function montarEmailContagem({ nome, periodo, itens }, { data, hora }) {
     `<tr><td style="padding:4px 0;color:#666">Hora</td><td style="text-align:right"><strong>${hora}</strong></td></tr>` +
     `</table>` +
     `<table style="width:100%;border-collapse:collapse;border:1px solid #eee">` +
-    `<tr style="background:#f6f3ef"><th style="padding:8px 12px;text-align:left">Item</th><th style="padding:8px 12px;text-align:right">Unidades</th></tr>` +
+    `<tr style="background:#f6f3ef"><th style="padding:8px;text-align:left;font-size:12px">Item</th>` +
+    GELADEIRAS.map((g) => `<th style="${th}">${esc(g)}</th>`).join('') +
+    `<th style="${th}">Total</th></tr>` +
     linhas +
-    `<tr style="background:#f6f3ef"><td style="padding:8px 12px"><strong>Total</strong></td><td style="padding:8px 12px;text-align:right"><strong>${total}</strong></td></tr>` +
+    `<tr style="background:#f6f3ef"><td style="padding:8px"><strong>Total</strong></td>` +
+    totaisGel.map((n) => `<td style="padding:8px;text-align:right"><strong>${n}</strong></td>`).join('') +
+    `<td style="padding:8px;text-align:right"><strong>${total}</strong></td></tr>` +
     `</table></div>`;
 
   return {
@@ -258,7 +273,7 @@ function criarHandler(deps = {}) {
       try {
         await store.setJSON(chaveAbertura(dados.turno), {
           nome: dados.nome, data: quando.data, hora: quando.hora,
-          ts: instante.toISOString(), itens: dados.itens.map(({ id, qtd }) => ({ id, qtd }))
+          ts: instante.toISOString(), itens: dados.itens.map(({ id, qtd, geladeiras }) => ({ id, qtd, geladeiras }))
         });
       } catch (e) {
         console.error('Erro ao guardar a abertura', e);

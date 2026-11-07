@@ -2,10 +2,11 @@
   'use strict';
 
   var ENDPOINT = '/.netlify/functions/relatorio';
-  var RASCUNHO_KEY = 'rascunhoContagem';
+  var RASCUNHO_KEY = 'rascunhoContagemV3';
   var RASCUNHO_VALIDADE_MS = 12 * 60 * 60 * 1000; // 12 horas
 
-  var ITENS = []; // carregado de itens.json
+  var ITENS = [];       // carregado de itens.json
+  var GELADEIRAS = [];  // carregado de config.json (nomes das geladeiras)
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -15,12 +16,9 @@
     final: $('tela-final')
   };
 
-  var estado = {
-    nome: '',
-    periodo: '',
-    confirmado: [],
-    enviando: false
-  };
+  // conf[f][i] = o item i da geladeira f foi confirmado
+  // tab: 0..F-1 = geladeira; F = aba "Total"
+  var estado = { nome: '', periodo: '', conf: [], tab: 0, enviando: false };
 
   function mostrar(nomeTela) {
     Object.keys(telas).forEach(function (k) {
@@ -35,20 +33,56 @@
     });
   }
 
-  // ---- Lista de bebidas (fonte única: itens.json) ----
-  function carregarItens() {
-    return fetch('itens.json', { cache: 'no-cache' })
-      .then(function (r) {
-        if (!r.ok) throw new Error('itens');
-        return r.json();
-      })
-      .then(function (lista) {
-        if (!Array.isArray(lista) || !lista.length) throw new Error('itens');
-        ITENS = lista;
-      });
+  // ---- Dados (fonte única: itens.json e config.json) ----
+  function buscarJson(url) {
+    return fetch(url, { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error(url);
+      return r.json();
+    });
   }
 
-  var carregando = carregarItens().catch(function () { /* tratado ao entrar */ });
+  function carregarDados() {
+    return Promise.all([buscarJson('itens.json'), buscarJson('config.json')]).then(function (res) {
+      var lista = res[0], cfg = res[1];
+      if (!Array.isArray(lista) || !lista.length) throw new Error('itens');
+      if (!cfg || !Array.isArray(cfg.geladeiras) || !cfg.geladeiras.length) throw new Error('config');
+      ITENS = lista;
+      GELADEIRAS = cfg.geladeiras;
+    });
+  }
+
+  carregarDados().catch(function () { /* tratado ao entrar */ });
+
+  var campoId = function (f, i) { return 'qtd-' + f + '-' + i; };
+  var campo = function (f, i) { return $(campoId(f, i)); };
+  var botao = function (f, i) { return $('ok-' + f + '-' + i); };
+  var ehNumero = function (v) { return /^\d{1,4}$/.test(v); };
+  var abrev = function (g) { return g.replace(/^Geladeira\s+/i, 'Gel. '); };
+  var abrevCurta = function (g) { return g.replace(/^Geladeira\s+/i, 'G'); }; // cabeçalho da tabela Total
+
+  // ---- Regras do fluxo ----
+  function valido(f, i) { return ehNumero(campo(f, i).value); }
+  function concluida(f) { return estado.conf[f].every(Boolean); }
+  function feitos(f) { return estado.conf[f].filter(Boolean).length; }
+  // uma geladeira só é liberada quando todas as anteriores estão completas
+  function liberada(f) {
+    for (var k = 0; k < f; k++) if (!concluida(k)) return false;
+    return true;
+  }
+  function tudoPronto() { return GELADEIRAS.every(function (_, f) { return concluida(f); }); }
+  // item liberado dentro da geladeira (o primeiro ainda não confirmado)
+  function indiceAtivo(f) { return estado.conf[f].indexOf(false); }
+  // primeira geladeira ainda incompleta (ou -1 se tudo pronto)
+  function primeiraIncompleta() {
+    for (var f = 0; f < GELADEIRAS.length; f++) if (!concluida(f)) return f;
+    return -1;
+  }
+  function totalItem(i) {
+    return GELADEIRAS.reduce(function (s, _, f) {
+      var v = campo(f, i).value;
+      return s + (ehNumero(v) ? parseInt(v, 10) : 0);
+    }, 0);
+  }
 
   // ---- Rascunho (protege contra o celular recarregar a página no meio da contagem) ----
   function salvarRascunho() {
@@ -58,8 +92,11 @@
         periodo: estado.periodo,
         ts: Date.now(),
         ids: ITENS.map(function (x) { return x.id; }),
-        valores: ITENS.map(function (_, i) { return $('qtd-' + i).value; }),
-        confirmado: estado.confirmado
+        geladeiras: GELADEIRAS,
+        valores: GELADEIRAS.map(function (_, f) {
+          return ITENS.map(function (_, i) { return campo(f, i).value; });
+        }),
+        conf: estado.conf
       }));
     } catch (e) {}
   }
@@ -71,6 +108,7 @@
       if (r.nome !== estado.nome || r.periodo !== estado.periodo) return null;
       var ids = ITENS.map(function (x) { return x.id; });
       if (JSON.stringify(r.ids) !== JSON.stringify(ids)) return null;
+      if (JSON.stringify(r.geladeiras) !== JSON.stringify(GELADEIRAS)) return null;
       return r;
     } catch (e) { return null; }
   }
@@ -96,7 +134,7 @@
 
     var btn = $('btn-entrar');
     btn.disabled = true;
-    (ITENS.length ? Promise.resolve() : carregarItens())
+    (ITENS.length ? Promise.resolve() : carregarDados())
       .then(function () {
         erro.hidden = true;
         estado.nome = nome;
@@ -105,7 +143,7 @@
 
         $('topo-nome').textContent = nome;
         $('topo-periodo').textContent = estado.periodo;
-        montarLista();
+        montarTela();
         mostrar('contagem');
       })
       .catch(function () {
@@ -123,121 +161,228 @@
     mostrar('login');
   });
 
-  // ---- Lista sequencial ----
-  function montarLista() {
-    estado.confirmado = ITENS.map(function () { return false; });
+  // ---- Montagem da tela: abas + uma lista por geladeira ----
+  function montarTela() {
+    var F = GELADEIRAS.length;
+    estado.conf = GELADEIRAS.map(function () { return ITENS.map(function () { return false; }); });
+    estado.tab = 0;
     estado.enviando = false;
     $('erro-envio').hidden = true;
+    $('aviso-etapa').hidden = true;
 
-    var ul = $('lista');
-    ul.innerHTML = '';
+    // abas
+    var nav = $('abas');
+    nav.innerHTML = '';
+    GELADEIRAS.forEach(function (g, f) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'aba'; b.id = 'aba-' + f;
+      b.innerHTML = '<b>' + esc(abrev(g)) + '</b><small></small>';
+      b.addEventListener('click', function () { irParaAba(f); });
+      nav.appendChild(b);
+    });
+    var bt = document.createElement('button');
+    bt.type = 'button'; bt.className = 'aba'; bt.id = 'aba-' + F;
+    bt.innerHTML = '<b>Total</b><small>resumo</small>';
+    bt.addEventListener('click', function () { irParaAba(F); });
+    nav.appendChild(bt);
 
-    ITENS.forEach(function (item, i) {
-      var li = document.createElement('li');
-      li.className = 'item';
-      li.id = 'item-' + i;
-      li.innerHTML =
-        '<img src="' + esc(item.img) + '" alt="" width="64" height="64">' +
-        '<div class="nome">' + esc(item.nome) + '<small>unidades em estoque</small></div>' +
-        '<div class="acao">' +
-          '<input type="number" inputmode="numeric" min="0" max="9999" step="1" placeholder="0" ' +
-                 'aria-label="Quantidade de ' + esc(item.nome) + '" id="qtd-' + i + '">' +
-          '<button type="button" class="btn-check" id="ok-' + i + '" aria-label="Confirmar ' + esc(item.nome) + '">✓</button>' +
-        '</div>';
-      ul.appendChild(li);
+    // listas
+    var cont = $('listas');
+    cont.innerHTML = '';
+    GELADEIRAS.forEach(function (g, f) {
+      var ul = document.createElement('ul');
+      ul.className = 'lista'; ul.id = 'lista-' + f;
 
-      var input = li.querySelector('input');
-      var botao = li.querySelector('.btn-check');
+      ITENS.forEach(function (item, i) {
+        var li = document.createElement('li');
+        li.className = 'item'; li.id = 'item-' + f + '-' + i;
+        li.innerHTML =
+          '<img src="' + esc(item.img) + '" alt="" width="64" height="64">' +
+          '<div class="nome">' + esc(item.nome) + '<small>unidades nesta geladeira</small></div>' +
+          '<div class="acao">' +
+            '<input type="number" inputmode="numeric" min="0" max="9999" step="1" placeholder="0" ' +
+                   'aria-label="' + esc(item.nome) + ' - ' + esc(g) + '" id="' + campoId(f, i) + '">' +
+            '<button type="button" class="btn-check" id="ok-' + f + '-' + i + '" aria-label="Confirmar ' + esc(item.nome) + '">✓</button>' +
+          '</div>';
+        ul.appendChild(li);
 
-      input.addEventListener('input', function () {
-        // só dígitos, sem sinais
-        input.value = input.value.replace(/[^0-9]/g, '').slice(0, 4);
-        atualizar();
-        salvarRascunho();
+        var input = li.querySelector('input');
+        var ok = li.querySelector('.btn-check');
+        input.addEventListener('input', function () {
+          // só dígitos, sem sinais
+          input.value = input.value.replace(/[^0-9]/g, '').slice(0, 4);
+          atualizar();
+          salvarRascunho();
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !ok.disabled) ok.click();
+        });
+        ok.addEventListener('click', function () { alternar(f, i); });
       });
-      input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !botao.disabled) botao.click();
-      });
-      botao.addEventListener('click', function () { alternar(i); });
+      cont.appendChild(ul);
     });
 
+    // rascunho
     var r = lerRascunho();
     if (r) {
-      ITENS.forEach(function (_, i) {
-        $('qtd-' + i).value = r.valores[i] || '';
-        estado.confirmado[i] = !!r.confirmado[i] && /^\d{1,4}$/.test($('qtd-' + i).value);
+      GELADEIRAS.forEach(function (_, f) {
+        var quebrou = false;
+        ITENS.forEach(function (_, i) {
+          campo(f, i).value = (r.valores[f] && r.valores[f][i]) || '';
+          var c = !!(r.conf[f] && r.conf[f][i]) && valido(f, i);
+          if (!c) quebrou = true;
+          estado.conf[f][i] = c && !quebrou; // confirmações sempre em sequência
+        });
       });
-      atualizar(true);
-    } else {
-      atualizar();
-    }
-  }
-
-  function valido(i) {
-    var v = $('qtd-' + i).value;
-    return v !== '' && /^\d{1,4}$/.test(v);
-  }
-
-  function alternar(i) {
-    if (estado.confirmado[i]) {
-      // desfaz esta confirmação e as seguintes (mantém os valores digitados)
-      for (var k = i; k < ITENS.length; k++) estado.confirmado[k] = false;
-    } else if (valido(i)) {
-      estado.confirmado[i] = true;
+      var pi = primeiraIncompleta();
+      estado.tab = pi === -1 ? F : pi;
     }
     atualizar(true);
+  }
+
+  function irParaAba(t) {
+    if ($('aba-' + t).disabled) return;
+    estado.tab = t;
+    $('aviso-etapa').hidden = true;
+    atualizar();
+    window.scrollTo(0, 0);
+    if (t < GELADEIRAS.length) {
+      var idx = indiceAtivo(t);
+      if (idx >= 0) $('item-' + t + '-' + idx).scrollIntoView({ block: 'center' });
+    }
+  }
+
+  // ---- Confirmar / desfazer ----
+  function alternar(f, i) {
+    var antes = concluida(f);
+    if (estado.conf[f][i]) {
+      // desfaz este item e os seguintes DESTA geladeira (mantém os números digitados)
+      for (var k = i; k < ITENS.length; k++) estado.conf[f][k] = false;
+    } else if (valido(f, i)) {
+      estado.conf[f][i] = true;
+    }
+    if (!antes && concluida(f)) avancar(f);
+    else atualizar(true);
     salvarRascunho();
   }
 
-  // índice do item liberado agora (primeiro não confirmado)
-  function indiceAtivo() {
-    return estado.confirmado.indexOf(false);
+  // geladeira completa: vai para a próxima que falta (ou para o resumo)
+  function avancar(f) {
+    var F = GELADEIRAS.length;
+    var prox = primeiraIncompleta();
+    var aviso = $('aviso-etapa');
+    if (prox === -1) {
+      estado.tab = F;
+      aviso.textContent = GELADEIRAS[f] + ' concluída. Todas as geladeiras foram contadas: confira o total e gere o relatório.';
+    } else {
+      estado.tab = prox;
+      aviso.textContent = GELADEIRAS[f] + ' concluída. Agora conte a ' + GELADEIRAS[prox] + '.';
+    }
+    aviso.hidden = false;
+    atualizar(true);
+    window.scrollTo(0, 0);
   }
 
+  // ---- Atualiza toda a interface a partir do estado ----
   function atualizar(focar) {
-    var ativo = indiceAtivo();
-    var total = ITENS.length;
-    var feitos = estado.confirmado.filter(Boolean).length;
+    var F = GELADEIRAS.length, N = ITENS.length;
 
-    ITENS.forEach(function (_, i) {
-      var li = $('item-' + i);
-      var input = $('qtd-' + i);
-      var botao = $('ok-' + i);
-      var conf = estado.confirmado[i];
-      var liberado = (i === ativo);
+    // garante que a aba atual é válida
+    if (estado.tab === F && !tudoPronto()) estado.tab = primeiraIncompleta();
+    else if (estado.tab < F && !liberada(estado.tab)) estado.tab = primeiraIncompleta();
 
-      li.classList.toggle('confirmado', conf);
-      li.classList.toggle('ativo', liberado);
-      li.classList.toggle('bloqueado', !conf && !liberado);
+    GELADEIRAS.forEach(function (_, f) {
+      $('lista-' + f).hidden = (estado.tab !== f);
+      var ativo = liberada(f) ? indiceAtivo(f) : -1;
 
-      input.disabled = conf || !liberado;
-      // item confirmado: botão fica habilitado para permitir desfazer
-      botao.disabled = conf ? false : !(liberado && valido(i));
+      ITENS.forEach(function (_, i) {
+        var li = $('item-' + f + '-' + i);
+        var conf = estado.conf[f][i];
+        var liberado = (i === ativo);
+        li.classList.toggle('confirmado', conf);
+        li.classList.toggle('ativo', liberado);
+        li.classList.toggle('bloqueado', !conf && !liberado);
+        campo(f, i).disabled = conf || !liberado;
+        // item confirmado: botão fica habilitado para permitir desfazer
+        botao(f, i).disabled = conf ? false : !(liberado && valido(f, i));
+      });
+
+      var aba = $('aba-' + f);
+      aba.disabled = !liberada(f);
+      aba.classList.toggle('ativa', estado.tab === f);
+      aba.classList.toggle('concluida', concluida(f));
+      aba.querySelector('small').textContent = (concluida(f) ? '✓ ' : '') + feitos(f) + '/' + N;
     });
 
-    $('barra-prog').style.width = (feitos / total * 100) + '%';
-    $('txt-prog').textContent = feitos + ' de ' + total + ' confirmados';
-    $('btn-gerar').disabled = estado.enviando || feitos !== total;
+    var abaTotal = $('aba-' + F);
+    abaTotal.disabled = !tudoPronto();
+    abaTotal.classList.toggle('ativa', estado.tab === F);
+    abaTotal.classList.toggle('concluida', tudoPronto());
 
-    if (focar && ativo >= 0) {
-      $('qtd-' + ativo).focus();
-      $('item-' + ativo).scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('painel-total').hidden = (estado.tab !== F);
+    $('bloco-prog').hidden = (estado.tab === F);
+    if (estado.tab < F) {
+      var n = feitos(estado.tab);
+      $('barra-prog').style.width = (n / N * 100) + '%';
+      $('txt-prog').textContent = GELADEIRAS[estado.tab] + ': ' + n + ' de ' + N + ' confirmados';
+    } else {
+      renderTotal();
     }
+
+    $('btn-gerar').disabled = estado.enviando || !tudoPronto();
+
+    if (focar && estado.tab < F) {
+      var idx = indiceAtivo(estado.tab);
+      if (idx >= 0) {
+        campo(estado.tab, idx).focus();
+        $('item-' + estado.tab + '-' + idx).scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+
+  // ---- Aba "Total": cada item x geladeiras + soma ----
+  function renderTotal() {
+    var soma = GELADEIRAS.map(function () { return 0; });
+    var geral = 0;
+    var html = '<table class="tabela-total"><thead><tr><th>Item</th>' +
+      GELADEIRAS.map(function (g) { return '<th>' + esc(abrevCurta(g)) + '</th>'; }).join('') +
+      '<th>Total</th></tr></thead><tbody>';
+
+    ITENS.forEach(function (item, i) {
+      html += '<tr><td>' + esc(item.nome) + '</td>';
+      GELADEIRAS.forEach(function (_, f) {
+        var v = ehNumero(campo(f, i).value) ? parseInt(campo(f, i).value, 10) : 0;
+        soma[f] += v;
+        html += '<td>' + v + '</td>';
+      });
+      var t = totalItem(i);
+      geral += t;
+      html += '<td class="t">' + t + '</td></tr>';
+    });
+
+    html += '</tbody><tfoot><tr><td>Total geral</td>' +
+      soma.map(function (n) { return '<td>' + n + '</td>'; }).join('') +
+      '<td class="t">' + geral + '</td></tr></tfoot></table>' +
+      '<p class="dica">Para corrigir algo, volte na aba da geladeira e toque no ✓ do item.</p>';
+    $('painel-total').innerHTML = html;
   }
 
   // ---- Gerar relatório ----
   function coletar() {
     return ITENS.map(function (item, i) {
-      return { id: item.id, nome: item.nome, qtd: parseInt($('qtd-' + i).value, 10) };
+      var g = GELADEIRAS.map(function (_, f) { return parseInt(campo(f, i).value, 10); });
+      return { id: item.id, nome: item.nome, geladeiras: g, qtd: g.reduce(function (a, b) { return a + b; }, 0) };
     });
   }
 
   function gerar() {
-    if (estado.enviando || estado.confirmado.indexOf(false) !== -1) return;
+    if (estado.enviando || !tudoPronto()) return;
 
     var itens = coletar();
-    var resumo = itens.map(function (x) { return x.nome + ': ' + x.qtd; }).join('\n');
-    if (!window.confirm('Enviar o relatório com estas quantidades?\n\n' + resumo)) return;
+    var resumo = itens.map(function (x) {
+      return x.nome + ': ' + x.qtd + ' (' + x.geladeiras.join(' / ') + ')';
+    }).join('\n');
+    if (!window.confirm('Enviar o relatório com estas quantidades?\n(total e geladeiras)\n\n' + resumo)) return;
 
     estado.enviando = true;
     var btn = $('btn-gerar');
@@ -295,6 +440,7 @@
     }
     $('final-msg').textContent = msg;
 
+    var geral = 0;
     var html =
       '<div class="linha"><span>Funcionário</span><strong>' + esc(data.nome) + '</strong></div>' +
       '<div class="linha"><span>Momento</span><strong>' + esc(data.periodo) + '</strong></div>' +
@@ -302,8 +448,12 @@
       '<div class="linha"><span>Hora</span><strong>' + esc(data.hora) + '</strong></div>' +
       '<h2>Quantidades</h2>';
     itens.forEach(function (x) {
-      html += '<div class="linha item-linha"><span>' + esc(x.nome) + '</span><strong>' + x.qtd + '</strong></div>';
+      geral += x.qtd;
+      var detalhe = x.geladeiras.map(function (n, j) { return 'G' + (j + 1) + ' ' + n; }).join(' · ');
+      html += '<div class="linha item-linha"><span>' + esc(x.nome) + '<small>' + esc(detalhe) + '</small></span>' +
+              '<strong>' + x.qtd + '</strong></div>';
     });
+    html += '<div class="linha item-linha total-geral"><span>Total geral</span><strong>' + geral + '</strong></div>';
     $('comprovante').innerHTML = html;
     mostrar('final');
   }

@@ -55,6 +55,11 @@
     "img": "img/fanta-guarana.svg"
   },
   {
+    "id": "guarana-antarctica",
+    "nome": "Guaraná Antarctica",
+    "img": "img/guarana-antarctica.svg"
+  },
+  {
     "id": "monster",
     "nome": "Monster",
     "img": "img/monster.svg"

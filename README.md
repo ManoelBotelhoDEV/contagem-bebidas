@@ -7,21 +7,25 @@ Cada contagem gera um e-mail para o dono, e **no fechamento** é enviado também
 ## Como funciona
 
 1. O funcionário abre o app, digita o nome, escolhe o momento (Almoço/Jantar - Abertura/Fechamento) e toca em **Entrar**.
-2. Para cada bebida, digita a quantidade e toca no **✓**. O item seguinte só é liberado depois de confirmar o anterior.
-   Tocar no ✓ de um item já confirmado desfaz a confirmação dele e dos itens abaixo (os números digitados são mantidos).
-3. Com todos os itens confirmados, o botão **Gerar relatório** é liberado.
-4. O servidor valida os dados, registra data/hora (fuso de Brasília, `DD-MM-AAAA` e `HH-MM`) e envia o(s) e-mail(s).
+2. A contagem é feita **uma geladeira por vez**, nas abas **Gel. 1 → Gel. 2 → Gel. 3 → Total**.
+   Dentro da geladeira, o funcionário digita a quantidade de cada bebida e toca no **✓**; o item seguinte só é liberado depois de confirmar o anterior.
+   Se a bebida não está naquela geladeira, digita **0** (campo vazio não vale).
+3. Ao confirmar todos os itens de uma geladeira, o app avisa e passa sozinho para a próxima. A Gel. 2 só é liberada com a Gel. 1 completa, e a Gel. 3 com a Gel. 2 completa.
+4. Com as três geladeiras completas, abre a aba **Total** (item × G1, G2, G3 e soma) e o botão **Gerar relatório** é liberado.
+   Para corrigir algo, é só voltar na aba da geladeira e tocar no ✓ do item: ele e os de baixo **da mesma geladeira** voltam a ser editáveis (os números digitados são mantidos). A geladeira volta a ficar incompleta e as seguintes ficam bloqueadas até ela ser refeita.
+5. O servidor valida os dados, registra data/hora (fuso de Brasília, `DD-MM-AAAA` e `HH-MM`) e envia o(s) e-mail(s).
 
 Se o celular recarregar a página no meio da contagem, ao entrar de novo com o **mesmo nome e o mesmo momento**
-o progresso é recuperado (vale por 12 horas e é apagado quando o relatório é enviado).
+o progresso (geladeiras e itens já confirmados) é recuperado (vale por 12 horas e é apagado quando o relatório é enviado).
 
 ### Os e-mails
 
 | Momento | E-mails enviados |
 |---|---|
-| Abertura (Almoço ou Jantar) | Comprovante da contagem. A contagem fica guardada para o fechamento. |
-| Fechamento (Almoço ou Jantar) | Comprovante do fechamento **+ Relatório final**: item a item, Abertura × Fechamento × Diferença, com totais. |
+| Abertura (Almoço ou Jantar) | Comprovante da contagem, com **Geladeira 1, 2, 3 e Total** por item. A contagem fica guardada para o fechamento. |
+| Fechamento (Almoço ou Jantar) | Comprovante do fechamento (mesmas colunas) **+ Relatório final**: item a item, Abertura × Fechamento × Diferença, com totais. |
 
+- O relatório final compara o **total** de cada item (soma das geladeiras). Mover bebidas de uma geladeira para outra não gera diferença.
 - **Diferença = fechamento − abertura.** Negativo (vermelho): o estoque diminuiu. Positivo (verde): aumentou, por exemplo com reposição durante o turno.
 - O fechamento é comparado com a abertura **do mesmo turno** (Almoço com Almoço, Jantar com Jantar). Vale a abertura mais recente feita há no máximo 16 horas, então o jantar que termina depois da meia-noite funciona.
 - Se alguém contar a abertura duas vezes, vale a **última** contagem.
@@ -41,6 +45,20 @@ Para incluir, remover ou reordenar uma bebida, edite só esse arquivo (e coloque
 - `img`: caminho da imagem. Pode ser `.png` ou `.jpg`; basta apontar para o arquivo.
 - As imagens atuais são ilustrações genéricas (garrafa, lata, long neck). Troque por fotos reais quando quiser.
 - Ao mudar a lista, publique de novo. Evite mudar no meio de um turno: uma abertura feita com a lista antiga fica sem os itens novos (eles contam como 0 na comparação).
+
+## Geladeiras
+
+Os nomes das geladeiras ficam em **`config.json`**:
+
+```json
+{ "geladeiras": ["Geladeira 1", "Geladeira 2", "Geladeira 3"] }
+```
+
+Para ter 4 geladeiras ou renomear (ex.: "Balcão"), edite só essa lista e publique de novo; as abas, a tabela Total e os e-mails acompanham.
+A ordem da lista é a ordem em que as geladeiras são liberadas.
+O **total é sempre calculado no servidor** a partir das geladeiras; o número que o celular manda não é usado.
+Não troque a quantidade de geladeiras no meio de um turno: o rascunho salvo no celular é descartado e a comparação
+com uma abertura feita com outra configuração pode ficar incompleta.
 
 ## Tecnologia
 
