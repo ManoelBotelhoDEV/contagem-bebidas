@@ -280,11 +280,13 @@ function montarEmailFinal({ turno, pessoas, nFechamentos }, quando) {
   };
 }
 
-// Fechamento sem abertura registrada: avisa o dono em vez de ficar em silêncio
-function montarEmailSemAbertura(fechamento, quando) {
-  const msg =
-    `Não foi possível gerar o relatório final do ${fechamento.turno}: ` +
-    `nenhuma contagem de abertura recente foi encontrada para este turno.`;
+// Fechamento sem abertura registrada (ou armazenamento com problema): avisa o dono em vez de ficar em silêncio
+function montarEmailSemAbertura(fechamento, quando, falha) {
+  const msg = falha
+    ? `Não foi possível gerar o relatório final do ${fechamento.turno}: o armazenamento das contagens está com problema. ` +
+      `Detalhe técnico: ${falha}`
+    : `Não foi possível gerar o relatório final do ${fechamento.turno}: ` +
+      `nenhuma contagem de abertura recente foi encontrada para este turno.`;
   return {
     assunto: `ATENÇÃO - Fechamento sem abertura - ${fechamento.turno} - ${quando.data}`,
     texto: `${msg}\n\nFechamento registrado por ${fechamento.nome} em ${quando.data} ${quando.hora}.\n` +
@@ -298,11 +300,23 @@ function montarEmailSemAbertura(fechamento, quando) {
   };
 }
 
+// Acrescenta ao comprovante um aviso de que o armazenamento falhou (a contagem em si está completa no e-mail).
+function comAvisoArmazenamento(email, detalhe) {
+  const msg = 'Aviso: houve um problema ao guardar esta contagem no sistema, então ela pode não aparecer no relatório final. ' +
+              'As quantidades abaixo estão corretas. Detalhe técnico: ' + detalhe;
+  return {
+    ...email,
+    texto: `${msg}\n\n${email.texto}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto 12px;padding:10px 12px;` +
+          `background:#fff4e5;border:1px solid #f0b95b;color:#7a4a00;font-size:13px">${esc(msg)}</div>${email.html}`
+  };
+}
+
 // ---------- Armazenamento das contagens (Netlify Blobs) ----------
 async function abrirStorePadrao(event) {
   const { connectLambda, getStore } = require('@netlify/blobs');
   connectLambda(event); // necessário no formato clássico de função
-  return getStore({ name: 'contagem', consistency: 'strong' });
+  return getStore('contagem');
 }
 
 function criarHandler(deps = {}) {
@@ -332,32 +346,36 @@ function criarHandler(deps = {}) {
     const emails = [montarEmailContagem(dados, quando)];
     let final;
 
-    let store;
+    // O armazenamento só serve ao relatório final. Se falhar, o comprovante por e-mail continua saindo
+    // e o dono é avisado (com o detalhe técnico), em vez de travar o funcionário.
+    let store = null;
+    let falhaArmazenamento = null;
+    const registrarFalha = (etapa, e) => {
+      console.error(etapa, e);
+      if (!falhaArmazenamento) falhaArmazenamento = String((e && (e.name ? `${e.name}: ` : '') + (e.message || e)) || e).slice(0, 300);
+    };
     try { store = await abrirStore(event); }
-    catch (e) {
-      console.error('Erro ao abrir armazenamento', e);
-      return resposta(500, { ok: false, erro: 'Armazenamento indisponível. Avise o responsável.' });
-    }
+    catch (e) { registrarFalha('Erro ao abrir armazenamento', e); }
 
-    // Contagem desta pessoa (guardada ANTES de enviar: se algo falhar, ela tenta de novo sem duplicar nada).
+    // Contagem desta pessoa, guardada ANTES de enviar.
     const propria = {
       nome: dados.nome, data: quando.data, hora: quando.hora, ts: instante.toISOString(),
       itens: dados.itens.map(({ id, qtd, geladeiras }) => ({ id, qtd, geladeiras }))
     };
-    try {
-      await store.setJSON(chaveContagem(dados.momento, dados.turno, dados.nome), propria);
-    } catch (e) {
-      console.error('Erro ao guardar a contagem', e);
-      return resposta(500, { ok: false, erro: 'Não foi possível registrar a contagem. Tente novamente.' });
+    if (store) {
+      try { await store.setJSON(chaveContagem(dados.momento, dados.turno, dados.nome), propria); }
+      catch (e) { registrarFalha('Erro ao guardar a contagem', e); }
     }
 
     if (dados.momento === 'Fechamento') {
       let aberturas = [];
       let fechamentos = [];
-      try { aberturas = await lerContagens(store, 'Abertura', dados.turno, instante); }
-      catch (e) { console.error('Erro ao ler as aberturas', e); }
-      try { fechamentos = await lerContagens(store, 'Fechamento', dados.turno, instante); }
-      catch (e) { console.error('Erro ao ler os fechamentos', e); }
+      if (store) {
+        try { aberturas = await lerContagens(store, 'Abertura', dados.turno, instante); }
+        catch (e) { registrarFalha('Erro ao ler as aberturas', e); }
+        try { fechamentos = await lerContagens(store, 'Fechamento', dados.turno, instante); }
+        catch (e) { registrarFalha('Erro ao ler os fechamentos', e); }
+      }
       // garante a contagem que acabou de chegar, mesmo que a leitura ainda não a mostre
       fechamentos = fechamentos.filter((c) => slugNome(c.nome) !== slugNome(dados.nome)).concat(propria);
 
@@ -369,10 +387,12 @@ function criarHandler(deps = {}) {
         }, quando));
         final = 'enviado';
       } else {
-        emails.push(montarEmailSemAbertura(dados, quando));
+        emails.push(montarEmailSemAbertura(dados, quando, falhaArmazenamento));
         final = 'sem_abertura';
       }
     }
+
+    if (falhaArmazenamento) emails[0] = comAvisoArmazenamento(emails[0], falhaArmazenamento);
 
     // Um único envio em lote: os e-mails saem juntos ou nenhum sai.
     const remetente = process.env.EMAIL_REMETENTE || 'Contagem de Bebidas <onboarding@resend.dev>';
@@ -395,7 +415,7 @@ function criarHandler(deps = {}) {
 
     return resposta(200, {
       ok: true, nome: dados.nome, periodo: dados.periodo,
-      data: quando.data, hora: quando.hora, final
+      data: quando.data, hora: quando.hora, final, armazenamento: !falhaArmazenamento
     });
   };
 }

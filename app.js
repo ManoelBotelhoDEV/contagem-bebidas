@@ -438,6 +438,10 @@
       aviso.textContent = 'Atenção: não encontramos a contagem de abertura deste turno, então não foi possível calcular as diferenças. O responsável foi avisado por e-mail.';
       aviso.hidden = false;
     }
+    if (data.armazenamento === false) {
+      aviso.textContent = 'Atenção: o relatório foi enviado por e-mail, mas houve um problema ao guardar esta contagem no sistema, então ela pode não entrar no relatório final de diferenças. O responsável foi avisado por e-mail.';
+      aviso.hidden = false;
+    }
     $('final-msg').textContent = msg;
 
     var geral = 0;

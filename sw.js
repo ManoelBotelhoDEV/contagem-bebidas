@@ -1,6 +1,6 @@
 // Service worker mínimo: guarda os arquivos do app para abrir rápido.
 // A chamada de envio (/.netlify/functions/...) nunca é guardada em cache.
-var CACHE = 'contagem-v4';
+var CACHE = 'contagem-v5';
 var ARQUIVOS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.webmanifest', '/itens.json', '/config.json'];
 
 self.addEventListener('install', function (e) {

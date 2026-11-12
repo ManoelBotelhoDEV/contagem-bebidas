@@ -42,6 +42,7 @@ Sprite      |   2      2      0        |   2      0      -2
 - O relatório final é enviado **a cada fechamento** e traz tudo o que já foi registrado até ali. O e-mail do último a fechar é o completo; o assunto informa quantos fechamentos já entraram.
 - Só entram contagens do **mesmo turno** (Almoço com Almoço, Jantar com Jantar) feitas nas **últimas 16 horas**, então o jantar que termina depois da meia-noite funciona e as contagens de ontem ficam de fora.
 - Se ninguém tiver registrado a abertura do turno, o dono recebe o comprovante do fechamento e um e-mail de **aviso** ("Fechamento sem abertura"), e o funcionário vê um alerta na tela final.
+- **Se o armazenamento falhar** (por exemplo, o Netlify Blobs não estar disponível), o comprovante por e-mail **continua saindo normalmente**. O e-mail traz um aviso laranja no topo com o **detalhe técnico do erro**, o funcionário vê um aviso na tela final, e o relatório final de diferenças pode não ser gerado naquele turno. O erro completo também fica em *Logs → Functions → relatorio* na Netlify.
 - Os e-mails do fechamento são enviados juntos: ou saem todos, ou nenhum (e o funcionário pode tentar de novo).
 - No celular, a tabela larga rola para o lado; no computador ela aparece inteira (até 4 pessoas cabem sem rolar).
 
