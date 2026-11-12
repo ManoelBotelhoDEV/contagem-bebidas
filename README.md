@@ -22,15 +22,28 @@ o progresso (geladeiras e itens já confirmados) é recuperado (vale por 12 hora
 
 | Momento | E-mails enviados |
 |---|---|
-| Abertura (Almoço ou Jantar) | Comprovante da contagem, com **Geladeira 1, 2, 3 e Total** por item. A contagem fica guardada para o fechamento. |
-| Fechamento (Almoço ou Jantar) | Comprovante do fechamento (mesmas colunas) **+ Relatório final**: item a item, Abertura × Fechamento × Diferença, com totais. |
+| Abertura (Almoço ou Jantar) | Comprovante da contagem, com **Geladeira 1, 2, 3 e Total** por item. A contagem fica guardada, em nome de quem contou. |
+| Fechamento (Almoço ou Jantar) | Comprovante do fechamento (mesmas colunas) **+ Relatório final** com a contagem de **todos os funcionários** do turno. |
 
-- O relatório final compara o **total** de cada item (soma das geladeiras). Mover bebidas de uma geladeira para outra não gera diferença.
-- **Diferença = fechamento − abertura.** Negativo (vermelho): o estoque diminuiu. Positivo (verde): aumentou, por exemplo com reposição durante o turno.
-- O fechamento é comparado com a abertura **do mesmo turno** (Almoço com Almoço, Jantar com Jantar). Vale a abertura mais recente feita há no máximo 16 horas, então o jantar que termina depois da meia-noite funciona.
-- Se alguém contar a abertura duas vezes, vale a **última** contagem.
-- Se não houver abertura para comparar, o dono recebe o comprovante do fechamento e um e-mail de **aviso** ("Fechamento sem abertura"), e o funcionário vê um alerta na tela final.
-- Os dois e-mails do fechamento são enviados juntos: ou saem os dois, ou nenhum (e o funcionário pode tentar de novo).
+**Relatório final (por funcionário).** Para cada pessoa que contou naquele turno há um grupo de três colunas:
+**Abertura | Fechamento | Diferença**, item a item, com a linha de total no fim. No topo aparece quem contou e a data e hora de cada contagem.
+
+```
+Item        |      João                |       José
+            | Abert. Fech. Diferença   | Abert. Fech. Diferença
+Coca-Cola   |   1      1      0        |   1      0      -1
+Sprite      |   2      2      0        |   2      0      -2
+```
+
+- **Diferença = fechamento − abertura, da própria pessoa.** Negativo (vermelho): o estoque diminuiu. Positivo (verde): aumentou, por exemplo com reposição durante o turno.
+- Cada pessoa é identificada pelo **nome digitado** (maiúsculas, acentos e espaços extras são ignorados: "João Silva" e "joao  silva" são a mesma pessoa). Peça para todos usarem sempre o mesmo nome.
+- Se a mesma pessoa contar de novo o mesmo momento do turno, vale a **última** contagem dela.
+- Se alguém só contou um dos momentos (por exemplo, só abriu), o outro aparece como "—" e a diferença dessa pessoa não é calculada.
+- O relatório final é enviado **a cada fechamento** e traz tudo o que já foi registrado até ali. O e-mail do último a fechar é o completo; o assunto informa quantos fechamentos já entraram.
+- Só entram contagens do **mesmo turno** (Almoço com Almoço, Jantar com Jantar) feitas nas **últimas 16 horas**, então o jantar que termina depois da meia-noite funciona e as contagens de ontem ficam de fora.
+- Se ninguém tiver registrado a abertura do turno, o dono recebe o comprovante do fechamento e um e-mail de **aviso** ("Fechamento sem abertura"), e o funcionário vê um alerta na tela final.
+- Os e-mails do fechamento são enviados juntos: ou saem todos, ou nenhum (e o funcionário pode tentar de novo).
+- No celular, a tabela larga rola para o lado; no computador ela aparece inteira (até 4 pessoas cabem sem rolar).
 
 ## Lista de bebidas
 
@@ -109,6 +122,6 @@ Para testar o relatório final: faça uma contagem de **Almoço - Abertura**, de
 
 ## Limites deste protótipo
 
-- O histórico fica nos e-mails recebidos. O servidor guarda apenas a abertura mais recente de cada turno.
+- O histórico fica nos e-mails recebidos. O servidor guarda a contagem mais recente de cada pessoa em cada momento do turno (as de ontem são ignoradas).
 - O nome é digitado livremente (sem senha). Qualquer pessoa com o link consegue enviar uma contagem. Se quiser limitar a 4 pessoas, dá para trocar o campo por uma lista fixa de nomes ou pedir um PIN.
 - Se a internet cair no envio, o funcionário vê um aviso e pode tentar de novo sem perder as quantidades.
