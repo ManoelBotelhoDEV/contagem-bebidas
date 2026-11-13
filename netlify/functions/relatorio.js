@@ -29,6 +29,9 @@ function resposta(status, corpo) {
   return { statusCode: status, headers: HEADERS, body: JSON.stringify(corpo) };
 }
 
+// "lucasvivian@minastche.net" -> "l*****@minastche.net" (mostra o destino sem expor o endereço inteiro)
+const mascarar = (email) => String(email).replace(/^(.)([^@]*)(@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.min(b.length, 6)) + c);
+
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -408,6 +411,10 @@ function criarHandler(deps = {}) {
         console.error('Resend respondeu', r.status, await r.text());
         return resposta(502, { ok: false, erro: 'Não foi possível enviar o e-mail. Tente novamente.' });
       }
+      try {
+        const aceito = typeof r.json === 'function' ? await r.json() : null;
+        console.log('E-mails aceitos pelo Resend para', destino.map(mascarar).join(', '), JSON.stringify(aceito));
+      } catch (e) { /* só log */ }
     } catch (e) {
       console.error('Erro ao chamar Resend', e);
       return resposta(502, { ok: false, erro: 'Não foi possível enviar o e-mail. Tente novamente.' });
@@ -415,7 +422,8 @@ function criarHandler(deps = {}) {
 
     return resposta(200, {
       ok: true, nome: dados.nome, periodo: dados.periodo,
-      data: quando.data, hora: quando.hora, final, armazenamento: !falhaArmazenamento
+      data: quando.data, hora: quando.hora, final, armazenamento: !falhaArmazenamento,
+      para: destino.map(mascarar)
     });
   };
 }
