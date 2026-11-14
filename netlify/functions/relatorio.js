@@ -29,7 +29,7 @@ function resposta(status, corpo) {
   return { statusCode: status, headers: HEADERS, body: JSON.stringify(corpo) };
 }
 
-// "lucasvivian@minastche.net" -> "l*****@minastche.net" (mostra o destino sem expor o endereço inteiro)
+// Mascarar o endereço de destino sem expor o endereço inteiro.
 const mascarar = (email) => String(email).replace(/^(.)([^@]*)(@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.min(b.length, 6)) + c);
 
 function esc(s) {
