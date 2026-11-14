@@ -25,21 +25,25 @@ o progresso (geladeiras e itens já confirmados) é recuperado (vale por 12 hora
 | Abertura (Almoço ou Jantar) | Comprovante da contagem, com **Geladeira 1, 2, 3 e Total** por item. A contagem fica guardada, em nome de quem contou. |
 | Fechamento (Almoço ou Jantar) | Comprovante do fechamento (mesmas colunas) **+ Relatório final** com a contagem de **todos os funcionários** do turno. |
 
-**Relatório final (por funcionário).** Para cada pessoa que contou naquele turno há um grupo de três colunas:
-**Abertura | Fechamento | Diferença**, item a item, com a linha de total no fim. No topo aparece quem contou e a data e hora de cada contagem.
+**Relatório final.** Uma linha por bebida e estas colunas:
+**Abertura de cada pessoa que abriu | Fechamento de cada pessoa que fechou | Diferença.**
+Com 2 pessoas abrindo e 2 fechando são 5 colunas de dados (Abertura A, Abertura B, Fechamento C, Fechamento D, Diferença).
+O cabeçalho mostra o nome de cada pessoa, e no topo aparece quem contou e a data e hora de cada contagem.
 
 ```
-Item        |      João                |       José
-            | Abert. Fech. Diferença   | Abert. Fech. Diferença
-Coca-Cola   |   1      1      0        |   1      0      -1
-Sprite      |   2      2      0        |   2      0      -2
+Item       | Abertura A | Abertura B | Fechamento C | Fechamento D | Diferença
+Fanta uva  |     44     |     44     |      42      |      42      |   -2
+Sprite     |     53     |     53     |      48      |      46      |          <- em branco: C e D divergem
+Schweppes  |     44     |     45     |      40      |      40      |          <- em branco: A e B divergem
 ```
 
-- **Diferença = fechamento − abertura, da própria pessoa.** Negativo (vermelho): o estoque diminuiu. Positivo (verde): aumentou, por exemplo com reposição durante o turno.
-- Cada pessoa é identificada pelo **nome digitado** (maiúsculas, acentos e espaços extras são ignorados: "João Silva" e "joao  silva" são a mesma pessoa). Peça para todos usarem sempre o mesmo nome.
-- Se a mesma pessoa contar de novo o mesmo momento do turno, vale a **última** contagem dela.
-- Se alguém só contou um dos momentos (por exemplo, só abriu), o outro aparece como "—" e a diferença dessa pessoa não é calculada.
-- O relatório final é enviado **a cada fechamento** e traz tudo o que já foi registrado até ali. O e-mail do último a fechar é o completo; o assunto informa quantos fechamentos já entraram.
+- **A Diferença só é calculada quando as contagens batem**: as aberturas precisam ser iguais entre si **e** os fechamentos iguais entre si. Aí a diferença é fechamento − abertura. Se houver divergência em qualquer um dos lados, a célula fica **em branco** (e amarela), para a equipe conferir quem contou errado.
+- Negativo (vermelho): o estoque diminuiu. Positivo (verde): aumentou, por exemplo com reposição durante o turno.
+- O **Total** da coluna Diferença soma só as linhas sem divergência. Abaixo da tabela o relatório lista os itens com divergência.
+- Quem abre **não precisa ser** quem fecha: as colunas de abertura e de fechamento são independentes.
+- O número de colunas acompanha o número de pessoas que contaram (1 abertura e 1 fechamento = 2 colunas de dados, 3 aberturas = 3 colunas, e assim por diante). A ordem é a de quem contou primeiro.
+- Cada pessoa é identificada pelo **nome digitado** (maiúsculas, acentos e espaços extras são ignorados). Se a mesma pessoa contar de novo o mesmo momento do turno, vale a **última** contagem dela.
+- O relatório final é enviado **a cada fechamento** e traz tudo o que já foi registrado até ali. O e-mail do último a fechar é o completo; o assunto informa quantas aberturas e fechamentos já entraram. Se só um dos fechamentos chegou, a Diferença usa esse fechamento (desde que as aberturas batam).
 - Só entram contagens do **mesmo turno** (Almoço com Almoço, Jantar com Jantar) feitas nas **últimas 16 horas**, então o jantar que termina depois da meia-noite funciona e as contagens de ontem ficam de fora.
 - Se ninguém tiver registrado a abertura do turno, o dono recebe o comprovante do fechamento e um e-mail de **aviso** ("Fechamento sem abertura"), e o funcionário vê um alerta na tela final.
 - **Se o armazenamento falhar** (por exemplo, o Netlify Blobs não estar disponível), o comprovante por e-mail **continua saindo normalmente**. O e-mail traz um aviso laranja no topo com o **detalhe técnico do erro**, o funcionário vê um aviso na tela final, e o relatório final de diferenças pode não ser gerado naquele turno. O erro completo também fica em *Logs → Functions → relatorio* na Netlify.

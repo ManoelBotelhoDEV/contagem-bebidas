@@ -29,7 +29,7 @@ function resposta(status, corpo) {
   return { statusCode: status, headers: HEADERS, body: JSON.stringify(corpo) };
 }
 
-// Mascarar o endereço de destino sem expor o endereço inteiro.
+// "lucasvivian@minastche.net" -> "l*****@minastche.net" (mostra o destino sem expor o endereço inteiro)
 const mascarar = (email) => String(email).replace(/^(.)([^@]*)(@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.min(b.length, 6)) + c);
 
 function esc(s) {
@@ -159,125 +159,113 @@ async function lerContagens(store, momento, turno, instante) {
   });
 }
 
-// Junta abertura e fechamento de cada pessoa (na ordem em que começaram a contar).
-function agruparPorPessoa(aberturas, fechamentos) {
-  const mapa = new Map();
-  const add = (c, lado) => {
-    const k = slugNome(c.nome);
-    if (!mapa.has(k)) mapa.set(k, { nome: c.nome, ab: null, fe: null, primeiro: c.ts });
-    const p = mapa.get(k);
-    p[lado] = c;
-    p.nome = c.nome;
-    if (c.ts < p.primeiro) p.primeiro = c.ts;
-  };
-  aberturas.forEach((c) => add(c, 'ab'));
-  fechamentos.forEach((c) => add(c, 'fe'));
-  return [...mapa.values()].sort((a, b) => (a.primeiro < b.primeiro ? -1 : a.primeiro > b.primeiro ? 1 : 0));
-}
+// Ordem das colunas: quem começou a contar primeiro vem primeiro (A, B, ... / C, D, ...).
+const porHorario = (lista) => [...lista].sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
 
-// ---------- E-mail 2: relatório final (por funcionário) ----------
-// Para cada pessoa: abertura | fechamento | diferença (= fechamento - abertura).
-// Se a pessoa só contou um dos momentos, o outro fica "—" e não há diferença.
-function tabelaPorPessoa(pessoas) {
+// ---------- E-mail 2: relatório final ----------
+// Colunas: Abertura de cada pessoa | Fechamento de cada pessoa | Diferença.
+// A diferença (fechamento - abertura) só aparece quando as aberturas BATEM entre si e os
+// fechamentos BATEM entre si. Havendo divergência, a diferença fica em branco para que se
+// confira quem contou errado.
+function calcularLinhas(aberturas, fechamentos) {
   const qtdDe = (c, id) => {
-    if (!c) return null;
     const x = c.itens.find((i) => i.id === id);
     return x ? x.qtd : 0;
   };
-  const linhas = ITENS.map((ref) => ({
-    nome: ref.nome,
-    celulas: pessoas.map((p) => {
-      const ab = qtdDe(p.ab, ref.id);
-      const fe = qtdDe(p.fe, ref.id);
-      return { ab, fe, dif: ab !== null && fe !== null ? fe - ab : null };
-    })
-  }));
-  const totais = pessoas.map((_, j) => {
-    const col = (k) => {
-      const v = linhas.map((l) => l.celulas[j][k]).filter((x) => x !== null);
-      return v.length ? v.reduce((a, b) => a + b, 0) : null;
-    };
-    const ab = col('ab'), fe = col('fe');
-    return { ab, fe, dif: ab !== null && fe !== null ? fe - ab : null };
+  const iguais = (v) => v.every((n) => n === v[0]);
+  return ITENS.map((ref) => {
+    const ab = aberturas.map((c) => qtdDe(c, ref.id));
+    const fe = fechamentos.map((c) => qtdDe(c, ref.id));
+    const diverge = !(iguais(ab) && iguais(fe));
+    return { nome: ref.nome, ab, fe, diverge, dif: diverge ? null : fe[0] - ab[0] };
   });
-  return { linhas, totais };
 }
 
-function montarEmailFinal({ turno, pessoas, nFechamentos }, quando) {
-  const { linhas, totais } = tabelaPorPessoa(pessoas);
-  const v = (n) => (n === null ? '—' : String(n));
-  const d = (n) => (n === null ? '—' : sinal(n));
-  const quandoDe = (c) => (c ? `${c.data} ${c.hora}` : '—');
+function montarEmailFinal({ turno, aberturas, fechamentos }, quando) {
+  const linhas = calcularLinhas(aberturas, fechamentos);
+  const soma = (fn) => linhas.reduce((t, l) => t + fn(l), 0);
+  const totAb = aberturas.map((_, j) => soma((l) => l.ab[j]));
+  const totFe = fechamentos.map((_, j) => soma((l) => l.fe[j]));
+  const totDif = soma((l) => (l.dif === null ? 0 : l.dif));
+  const divergentes = linhas.filter((l) => l.diverge);
+  const nA = aberturas.length, nF = fechamentos.length;
+  const quandoDe = (c) => `${c.data} ${c.hora}`;
+  const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 
   // ----- texto simples -----
   const texto = [
     `RELATÓRIO FINAL - ${turno.toUpperCase()} - ${quando.data}`,
     '',
-    'Quem contou (data e hora):',
-    ...pessoas.map((p) => `- ${p.nome}: abertura ${quandoDe(p.ab)} | fechamento ${quandoDe(p.fe)}`),
+    'Aberturas: ' + aberturas.map((c) => `${c.nome} (${quandoDe(c)})`).join(', '),
+    'Fechamentos: ' + fechamentos.map((c) => `${c.nome} (${quandoDe(c)})`).join(', '),
     '',
-    'Item | ' + pessoas.map((p) => p.nome).join(' | ') + '   (abertura -> fechamento (diferença))',
-    ...linhas.map((l) => l.nome + ' | ' +
-      l.celulas.map((c) => `${v(c.ab)} -> ${v(c.fe)} (${d(c.dif)})`).join(' | ')),
+    'Item | ' + [...aberturas.map((c) => `Abertura ${c.nome}`), ...fechamentos.map((c) => `Fechamento ${c.nome}`), 'Diferença'].join(' | '),
+    ...linhas.map((l) => [l.nome, ...l.ab, ...l.fe, l.dif === null ? '' : sinal(l.dif)].join(' | ')),
     '',
-    'TOTAL | ' + totais.map((t) => `${v(t.ab)} -> ${v(t.fe)} (${d(t.dif)})`).join(' | '),
+    ['TOTAL', ...totAb, ...totFe, sinal(totDif)].join(' | '),
     '',
-    'Diferença = fechamento - abertura. Negativo: o estoque diminuiu. Positivo: o estoque aumentou (ex.: reposição durante o turno).',
-    '"—" = a pessoa não registrou esse momento neste turno.'
+    'Diferença = fechamento - abertura. Só é calculada quando as aberturas batem entre si e os fechamentos batem entre si; ' +
+      'caso contrário fica em branco. Negativo: o estoque diminuiu. Positivo: o estoque aumentou (ex.: reposição durante o turno).',
+    divergentes.length
+      ? `Itens com divergência (${divergentes.length} de ${linhas.length}): ${divergentes.map((l) => l.nome).join(', ')}. O total da Diferença soma só as linhas sem divergência.`
+      : 'Nenhum item com divergência entre as contagens.'
   ].join('\n');
 
   // ----- HTML -----
   const cor = (n) => (n === null ? '#999' : n < 0 ? '#b3261e' : n > 0 ? '#1b7f3b' : '#888');
   const borda = 'border-left:2px solid #d9d2c8;';
-  const base = 'padding:6px 7px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;';
-  const cel = (c, primeira) =>
-    `<td style="${base}${primeira ? borda : ''}${c.ab === null ? 'color:#999;' : ''}">${v(c.ab)}</td>` +
-    `<td style="${base}${c.fe === null ? 'color:#999;' : ''}">${v(c.fe)}</td>` +
-    `<td style="${base}font-weight:bold;color:${cor(c.dif)}">${d(c.dif)}</td>`;
+  const base = 'padding:6px 8px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;';
+  const th = 'padding:6px 8px;font-size:12px;text-align:center;background:#f6f3ef;vertical-align:bottom;';
+
+  const celulas = (l) =>
+    l.ab.map((n, j) => `<td style="${base}${j === 0 ? borda : ''}">${n}</td>`).join('') +
+    l.fe.map((n, j) => `<td style="${base}${j === 0 ? borda : ''}">${n}</td>`).join('') +
+    (l.dif === null
+      ? `<td style="${base}${borda}background:#fff4e5">&nbsp;</td>`
+      : `<td style="${base}${borda}font-weight:bold;color:${cor(l.dif)}">${sinal(l.dif)}</td>`);
 
   const corpo = linhas.map((l) =>
-    `<tr><td style="padding:6px 7px;border-bottom:1px solid #eee">${esc(l.nome)}</td>` +
-    l.celulas.map((c) => cel(c, true)).join('') + `</tr>`
+    `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(l.nome)}</td>${celulas(l)}</tr>`
   ).join('');
 
-  const th = 'padding:6px 7px;font-size:11px;color:#666;text-align:right;background:#f6f3ef;';
-  const cab1 = pessoas.map((p) =>
-    `<th colspan="3" style="${borda}padding:8px 7px;text-align:center;background:#f6f3ef;font-size:13px">${esc(p.nome)}</th>`
-  ).join('');
-  const cab2 = pessoas.map(() =>
-    `<th style="${th}${borda}">Abertura</th><th style="${th}">Fechamento</th><th style="${th}">Diferença</th>`
-  ).join('');
-  const rodape = totais.map((t) =>
-    `<td style="${base}${borda}background:#f6f3ef;font-weight:bold">${v(t.ab)}</td>` +
-    `<td style="${base}background:#f6f3ef;font-weight:bold">${v(t.fe)}</td>` +
-    `<td style="${base}background:#f6f3ef;font-weight:bold;color:${cor(t.dif)}">${d(t.dif)}</td>`
-  ).join('');
+  const rodape =
+    totAb.map((n, j) => `<td style="${base}${j === 0 ? borda : ''}background:#f6f3ef;font-weight:bold">${n}</td>`).join('') +
+    totFe.map((n, j) => `<td style="${base}${j === 0 ? borda : ''}background:#f6f3ef;font-weight:bold">${n}</td>`).join('') +
+    `<td style="${base}${borda}background:#f6f3ef;font-weight:bold;color:${cor(totDif)}">${sinal(totDif)}</td>`;
 
-  const quem = pessoas.map((p) =>
-    `<div style="margin:0 0 8px;font-size:13px;color:#444"><strong style="color:#222">${esc(p.nome)}</strong><br>` +
-    `<span style="white-space:nowrap">Abertura: ${esc(quandoDe(p.ab))}</span>&nbsp;&nbsp; ` +
-    `<span style="white-space:nowrap">Fechamento: ${esc(quandoDe(p.fe))}</span></div>`
-  ).join('');
+  const quem = (rotulo, lista) =>
+    `<div style="margin:0 0 6px;font-size:13px;color:#444"><strong style="color:#222">${rotulo}:</strong> ` +
+    lista.map((c) => `<span style="white-space:nowrap">${esc(c.nome)} (${esc(quandoDe(c))})</span>`).join(', ') + `</div>`;
 
   const html =
     `<div style="font-family:Arial,sans-serif;color:#222">` +
     `<h2 style="color:#b3261e;margin:0 0 4px">Relatório final - ${esc(turno)} - ${quando.data}</h2>` +
-    `<p style="margin:0 0 12px;color:#666">Contagem por funcionário: abertura, fechamento e diferença</p>` +
-    `<div style="margin-bottom:16px">${quem}</div>` +
+    `<p style="margin:0 0 12px;color:#666">Aberturas, fechamentos e diferença</p>` +
+    `<div style="margin-bottom:14px">${quem('Aberturas', aberturas)}${quem('Fechamentos', fechamentos)}</div>` +
     `<div style="overflow-x:auto">` +
     `<table style="border-collapse:collapse;font-size:12px;border:1px solid #eee">` +
-    `<tr><th rowspan="2" style="padding:8px 7px;text-align:left;background:#f6f3ef;vertical-align:bottom">Item</th>${cab1}</tr>` +
-    `<tr>${cab2}</tr>` +
+    `<tr><th rowspan="2" style="${th}text-align:left">Item</th>` +
+    `<th colspan="${nA}" style="${th}${borda}font-size:13px">Abertura</th>` +
+    `<th colspan="${nF}" style="${th}${borda}font-size:13px">Fechamento</th>` +
+    `<th rowspan="2" style="${th}${borda}font-size:13px">Diferença</th></tr>` +
+    `<tr>` +
+    aberturas.map((c, j) => `<th style="${th}${j === 0 ? borda : ''}font-weight:normal;color:#555">${esc(c.nome)}</th>`).join('') +
+    fechamentos.map((c, j) => `<th style="${th}${j === 0 ? borda : ''}font-weight:normal;color:#555">${esc(c.nome)}</th>`).join('') +
+    `</tr>` +
     corpo +
-    `<tr><td style="padding:7px;background:#f6f3ef"><strong>Total</strong></td>${rodape}</tr>` +
+    `<tr><td style="padding:7px 8px;background:#f6f3ef"><strong>Total</strong></td>${rodape}</tr>` +
     `</table></div>` +
-    `<p style="color:#666;font-size:12px;margin-top:12px">` +
-    `Diferença = fechamento − abertura. Negativo: o estoque diminuiu. Positivo: o estoque aumentou (ex.: reposição durante o turno).<br>` +
-    `“—” = a pessoa não registrou esse momento neste turno.</p>` +
+    `<p style="color:#666;font-size:12px;margin:12px 0 4px">` +
+    `Diferença = fechamento − abertura. Só é calculada quando as aberturas batem entre si e os fechamentos batem entre si; ` +
+    `caso contrário fica em branco (célula amarela). Negativo: o estoque diminuiu. Positivo: aumentou (ex.: reposição durante o turno).</p>` +
+    (divergentes.length
+      ? `<p style="color:#7a4a00;font-size:12px;margin:4px 0"><strong>Itens com divergência (${divergentes.length} de ${linhas.length}):</strong> ` +
+        `${divergentes.map((l) => esc(l.nome)).join(', ')}. O total da Diferença soma só as linhas sem divergência.</p>`
+      : `<p style="color:#1b7f3b;font-size:12px;margin:4px 0">Nenhum item com divergência entre as contagens.</p>`) +
     `</div>`;
 
   return {
-    assunto: `Relatório final - ${turno} - ${quando.data} - ${nFechamentos} fechamento${nFechamentos === 1 ? '' : 's'} registrado${nFechamentos === 1 ? '' : 's'}`,
+    assunto: `Relatório final - ${turno} - ${quando.data} - ${plural(nA, 'abertura', 'aberturas')} e ${plural(nF, 'fechamento', 'fechamentos')}`,
     texto,
     html
   };
@@ -385,8 +373,8 @@ function criarHandler(deps = {}) {
       if (aberturas.length) {
         emails.push(montarEmailFinal({
           turno: dados.turno,
-          pessoas: agruparPorPessoa(aberturas, fechamentos),
-          nFechamentos: fechamentos.length
+          aberturas: porHorario(aberturas),
+          fechamentos: porHorario(fechamentos)
         }, quando));
         final = 'enviado';
       } else {
@@ -430,6 +418,6 @@ function criarHandler(deps = {}) {
 
 module.exports = {
   handler: criarHandler(),
-  criarHandler, validar, dataHoraBrasilia, slugNome, agruparPorPessoa, lerContagens,
+  criarHandler, validar, dataHoraBrasilia, slugNome, calcularLinhas, porHorario, lerContagens,
   montarEmailContagem, montarEmailFinal, montarEmailSemAbertura
 };
